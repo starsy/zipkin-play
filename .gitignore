@@ -12,7 +12,7 @@
 hs_err_pid*
 
 bin/
-target/.history
-
 target/
+
+target/.history
 /bin/
