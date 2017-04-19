@@ -43,3 +43,5 @@ dependencies {
         play "com.typesafe.play:${playModule}_$scalaVersion:$playVersion"
     }
 }
+
+compile 'net.jodah:failsafe:1.0.4'
