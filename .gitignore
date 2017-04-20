@@ -13,7 +13,8 @@ hs_err_pid*
 
 bin/
 target/
-project/
+project/target/
+project/project/
 .settings/
 
 target/.history
