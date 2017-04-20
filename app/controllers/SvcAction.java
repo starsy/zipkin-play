@@ -38,11 +38,11 @@ public class SvcAction extends play.mvc.Action.Simple {
 		log.info("call: ctx = " + ctx);
 		// }
 
-		if (ctx.request().accepts("application/json")) {
-			return doCall(ctx);
-		} else {
-			return CompletableFuture.completedFuture(status(NOT_ACCEPTABLE, "We only accept application/json"));
-		}
+		//if (ctx.request().accepts("application/json")) {
+		return doCall(ctx);
+		//} else {
+		//	return CompletableFuture.completedFuture(status(NOT_ACCEPTABLE, "We only accept application/json"));
+		//}
 	}
 
 	private CompletionStage<Result> doCall(Http.Context ctx) {
@@ -67,6 +67,7 @@ public class SvcAction extends play.mvc.Action.Simple {
 		}, ec.current());
 	}
 
+	/*
 	private CompletionStage<Result> timeout(final CompletionStage<Result> stage, final long delay,
 			final TimeUnit unit) {
 		final CompletionStage<Result> timeoutFuture = Futures.timeout(delay, unit).handle((v, e) -> {
@@ -75,5 +76,6 @@ public class SvcAction extends play.mvc.Action.Simple {
 		
 		return stage.applyToEither(timeoutFuture, Function.identity());
 	}
+	*/
 
 }

@@ -14,5 +14,4 @@ libraryDependencies += "io.zipkin.brave" % "brave" % "4.1.1"
 libraryDependencies += "io.zipkin.brave" % "brave-okhttp" % "4.1.1"
 libraryDependencies += "io.zipkin.brave" % "brave-spancollector-http" % "4.1.1"
 libraryDependencies += "io.zipkin.reporter" % "zipkin-sender-okhttp3" % "0.6.13"
-
-
+libraryDependencies += "junit" % "junit" % "4.12"

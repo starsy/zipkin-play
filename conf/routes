@@ -9,6 +9,16 @@ GET		/svc1						controllers.SvcController.index
 GET		/svc2						controllers.SvcController.index
 GET		/svc3						controllers.SvcController.index
 GET		/svc4						controllers.SvcController.index
+GET		/svc4						controllers.SvcController.index
+GET		/svc5						controllers.SvcController.index
+GET		/svc6						controllers.SvcController.index
+GET		/svc7						controllers.SvcController.index
+GET		/svc8						controllers.SvcController.index
+GET		/svc9						controllers.SvcController.index
+GET		/svc10						controllers.SvcController.index
+GET		/svc11						controllers.SvcController.index
+
+
 
 # Map static resources from the /public folder to the /assets URL path
 GET     /assets/*file               controllers.Assets.versioned(path="/public", file: Asset)

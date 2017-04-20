@@ -3,6 +3,8 @@ package controllers;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ExecutionException;
+import java.util.function.Function;
 
 import javax.inject.Inject;
 
@@ -16,6 +18,7 @@ import brave.propagation.TraceContext;
 import play.Logger;
 import play.libs.Json;
 import play.libs.concurrent.HttpExecutionContext;
+import play.libs.ws.WS;
 import play.libs.ws.WSClient;
 import play.libs.ws.WSRequest;
 import play.libs.ws.WSResponse;
@@ -56,6 +59,7 @@ public class SvcController extends Controller {
 	}
 	
 	Optional<String> getNextSvc() {
+//		String []list = {"svc1", "svc2", "svc3", "svc4", "svc5", "svc6", "svc7", "svc8", "svc9", "svc10", "svc11"};
 		String []list = {"svc1", "svc2", "svc3", "svc4"};
 		Optional<String> result = Optional.empty();
 		
@@ -69,27 +73,29 @@ public class SvcController extends Controller {
 	}
 
 	WSRequest injectB3(WSRequest req, TraceContext ctx) {
-		return req.setHeader("X─B3─TraceId", String.valueOf(ctx.traceId()))
-				.setHeader("X─B3─ParentSpanId", String.valueOf(ctx.parentId()))
-				.setHeader("X─B3─SpanId", String.valueOf(ctx.spanId()));
+		req = req.setHeader("X-B3-TraceId", String.valueOf(ctx.traceId()))
+		.setHeader("X-B3-ParentSpanId", String.valueOf(ctx.parentId()))
+		.setHeader("X-B3-SpanId", String.valueOf(ctx.spanId()));
+		
+		return req;
 	}
 	
 	brave.Span extractB3(Request req) {
-		String traceIdString = req.getHeader("X─B3─TraceId");
+		String traceIdString = req.getHeader("X-B3-TraceId");
 		long traceId = -1;
 		try {
 			traceId = Long.parseLong(traceIdString);
 		} catch (Exception e) {
 		}
 
-		String parentSpanIdString = req.getHeader("X─B3─ParentSpanId");
+		String parentSpanIdString = req.getHeader("X-B3-ParentSpanId");
 		long parentSpanId = -1;
 		try {
 			parentSpanId = Long.parseLong(parentSpanIdString);
 		} catch (Exception e) {
 		}
 
-		String spanIdString = req.getHeader("X─B3─SpanId");
+		String spanIdString = req.getHeader("X-B3-SpanId");
 		long spanId = -1;
 		try {
 			spanId = Long.parseLong(spanIdString);
@@ -104,7 +110,8 @@ public class SvcController extends Controller {
 		} else {
 			// existing trace
 			span = tracer
-					.joinSpan(TraceContext.newBuilder().traceId(traceId).spanId(spanId).parentId(parentSpanId).build());
+					.joinSpan(TraceContext.newBuilder().traceId(traceId).spanId(spanId).parentId(parentSpanId).build())
+					.kind(Kind.SERVER);
 		}
 
 		return span;
@@ -121,37 +128,64 @@ public class SvcController extends Controller {
 			brave.Span mySpan = extractB3(ctx().request());
 			mySpan.start();
 
-			Optional<String> nextSvcName = getNextSvc();
+			int times = RandomUtils.nextInt(0, 3);
 
-			log.info("Next service to be: {}", nextSvcName);
-			
-			if (nextSvcName.isPresent()) {
-				String nextServiceName = nextSvcName.get();
-				log.info("Next service: {}", nextSvcName);
+			for (int i = 0; i < times; i++) {
+
+				Optional<String> nextSvc = getNextSvc();
+
+				log.info("Next service to be: {}", nextSvc);
+
+				CompletionStage<WSResponse> responsePromise = null;
+
+				if (nextSvc.isPresent()) {
+					String nextServiceName = nextSvc.get();
+
+					brave.Span newSpan = tracer.newChild(mySpan.context()).name(nextServiceName).kind(Kind.CLIENT);
+					newSpan.remoteEndpoint(Endpoint.builder().serviceName(nextServiceName).build());
+					newSpan.start();
+
+					String url = "http://localhost:9000/" + nextServiceName;
+					WSRequest req = ws.url(url);
+
+					req = injectB3(req, newSpan.context());
+
+					log.info("Headers: {}", req.getHeaders());
+
+					log.info("Calling new service: {}", url);
+					responsePromise = req.get();
+					log.info("Got the promise for new service: {}", url);
+
+					/*
+					 * try { responsePromise.whenComplete((r, e) -> {
+					 * log.info("Service [{}] -> Service [{}], response: {}",
+					 * svcName, nextServiceName, r.getBody()); newSpan.finish();
+					 * reporter.flush(); }).toCompletableFuture().get(); } catch
+					 * (InterruptedException | ExecutionException e) {
+					 * log.error("Exception", e); }
+					 */
+					responsePromise.whenComplete((r, e) -> {
+						log.info("Service [{}] -> Service [{}], response: {}", svcName, nextServiceName, r.getBody());
+						newSpan.finish();
+						reporter.flush();
+					});
+				}
 				
-				brave.Span newSpan = tracer.newChild(mySpan.context()).name(nextServiceName).kind(Kind.CLIENT);
-				newSpan.remoteEndpoint(Endpoint.builder().serviceName(nextServiceName).build());
-				newSpan.start();
-				
-				String url = "http://localhost:9000/" + nextServiceName;
-				WSRequest req = ws.url(url);
-				
-				injectB3(req, newSpan.context());
-				
-				log.info("Calling new service: {}", nextServiceName);
-				CompletionStage<WSResponse> responsePromise = req.get();
-				responsePromise.whenComplete((r, t) -> {
-					log.info("Service [{}] -> Service [{}], response: {}", svcName, nextServiceName, r.getBody());
-					newSpan.finish();
-				});
+				try {
+					responsePromise.toCompletableFuture().get();
+				} catch (InterruptedException | ExecutionException e) {
+					log.error("Exception", e);
+				}
 			}
 			
 			log.info("[{}] do some real work", svcName);
 			Reply reply = doWork(svcName);
 			JsonNode json = Json.toJson(reply);
-
+			
 			log.info("[{}] Respond request", svcName);
 			mySpan.finish();
+			reporter.flush();
+			
 			return ok(Json.stringify(json));
 		}, ec.current()).exceptionally(throwable -> {
 			return badRequest("");
