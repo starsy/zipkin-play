@@ -12,19 +12,49 @@ import com.fasterxml.jackson.databind.JsonNode;
 import play.Logger;
 import play.libs.Json;
 import play.libs.concurrent.HttpExecutionContext;
+import play.libs.ws.WSClient;
 import play.mvc.Controller;
 import play.mvc.Result;
 import play.mvc.With;
+
+
+class Reply {
+	public long sleepTime;
+	public String service;
+	
+	public Reply(String s, long t) {
+		sleepTime = t;
+		service = s;
+	}
+
+	public long getSleepTime() {
+		return sleepTime;
+	}
+
+	public void setSleepTime(long sleepTime) {
+		this.sleepTime = sleepTime;
+	}
+
+	public String getService() {
+		return service;
+	}
+
+	public void setService(String service) {
+		this.service = service;
+	}
+}
 
 @With(SvcAction.class)
 public class SvcController extends Controller {
 	private HttpExecutionContext ec;
 	
+	@Inject WSClient ws;
+	
 	@Inject
 	public SvcController(HttpExecutionContext ec) {
 		this.ec = ec;
 	}
-
+	
 	String getSvcName() {
 		String path = ctx().request().path();
 		return path.substring(1);
@@ -32,7 +62,7 @@ public class SvcController extends Controller {
 	
 	public CompletionStage<Result> index() {
 		String svcName = getSvcName();
-		final Logger.ALogger log = play.Logger.of("application." +svcName + "-Controller");
+		final Logger.ALogger log = play.Logger.of("application.Controller-" + svcName);
 		
 		log.info("Path: {}", ctx().request().path());
 		
@@ -45,7 +75,7 @@ public class SvcController extends Controller {
 				throw new RuntimeException(e);
 			}
 
-			JsonNode json = Json.newObject().set("slept", Json.newObject().numberNode(nap));
+			JsonNode json = Json.toJson(new Reply(svcName, nap));
 
 			log.info("Respond request");
 			return ok(Json.stringify(json));
