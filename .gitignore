@@ -16,6 +16,8 @@ target/
 project/target/
 project/project/
 .settings/
+.cache-main
+.cache-tests
 
 target/.history
 /bin/
